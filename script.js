@@ -9,6 +9,11 @@ const CONFIG = {
   eventDate: "2026-10-10T20:00:00+02:00",           // drives the countdown
   cardTitle: "Saturday Night",
   dateLabel: "The tenth of October",
+  pickupLine: "I'll call for you at your door.",
+
+  // The button, and what it says once she's clicked it
+  acceptLabel: "I'll be ready",
+  acceptedLabel: "Then I'll be at your door.",
 
   // What awaits: no schedule, no venues, just the promise
   highlights: [
@@ -26,7 +31,7 @@ const CONFIG = {
     paragraphs: [
       "Some books are found by accident. This one was left here for you.",
       "Weeks are long and good Saturdays are rare, so I took the liberty of arranging one. There is nothing for you to plan, book or decide. Every detail has already been taken care of.",
-      "All that is asked of you is to arrive as you are, and to let the evening unfold.",
+      "All that is asked of you is to be ready as you are, and to let the evening unfold.",
       "Turn the page, and the library will show you the rest.",
     ],
     closing: "Yours, in good company,",
@@ -351,7 +356,7 @@ function openDoor() {
 
 acceptBtn.addEventListener("click", () => {
   acceptBtn.disabled = true;
-  acceptBtn.textContent = "Then it is settled.";
+  acceptBtn.textContent = CONFIG.acceptedLabel;
   seal.classList.add("stamp");
   // the card is taller than most screens, so bring the seal into view
   seal.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -377,6 +382,8 @@ function fillLetter() {
 function fillCard() {
   $("cardTitle").textContent = CONFIG.cardTitle;
   $("cardDate").textContent = CONFIG.dateLabel;
+  $("cardPickup").textContent = CONFIG.pickupLine;
+  acceptBtn.textContent = CONFIG.acceptLabel;
   $("dressCode").textContent = CONFIG.dressCode;
   $("signature").textContent = CONFIG.signature;
   $("sealInitial").textContent = CONFIG.sealInitial;
@@ -482,7 +489,7 @@ async function sendNotice() {
       await emailjs.send(CONFIG.emailjs.serviceId, CONFIG.emailjs.templateId, {
         name: "The Secret Library",
         time: new Date().toLocaleString(),
-        message: "She opened the library and accepted. Saturday is on.",
+        message: "She accepted. She'll be ready on Saturday.",
       });
 
       console.info(`EmailJS: notice sent (attempt ${attempt}).`);

@@ -410,6 +410,7 @@ button {
 }
 
 .card-date { font-style: italic; font-size: 1.15rem; }
+.card-pickup { margin-top: 4px; font-size: 0.95rem; color: var(--muted); }
 
 .divider {
   display: flex;
