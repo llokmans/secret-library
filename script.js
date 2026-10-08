@@ -7,14 +7,15 @@ const CONFIG = {
   sealInitial: "L",                                 // your initial on the wax seal
   signature: "Loki",
   eventDate: "2026-10-10T20:00:00+02:00",           // drives the countdown
-  dateLabel: "Saturday, the tenth of October",
+  cardTitle: "Saturday Night",
+  dateLabel: "The tenth of October",
 
-  // Venues stay secret: only times and cryptic hints
-  programme: [
-    { time: "Eight o'clock",      act: "Act I",     title: "Supper",     hint: "Where the river keeps an old secret." },
-    { time: "A quarter to ten",   act: "Interlude", title: "A Walk",     hint: "Old stones, city lights." },
-    { time: "A quarter past ten", act: "Act II",    title: "A Drink",    hint: "Behind a door with no name." },
-    { time: "Half past eleven",   act: "Act III",   title: "The Finale", hint: "Where the night keeps its music." },
+  // What awaits: no schedule, no venues, just the promise
+  highlights: [
+    "Some music",
+    "Some nice food",
+    "Some drinks",
+    "And a lot of fun",
   ],
 
   dressCode: "Elegant. Something you would wear to a gallery opening.",
@@ -57,6 +58,8 @@ const seal = $("seal");
 const reader = $("reader");
 const page = $("page");
 const turnBtn = $("turnBtn");
+const darkness = $("darkness");
+const candleCursor = $("candleCursor");
 
 const PALETTE = [
   "#5a1f24", "#3d1416", "#1f3a2e", "#163028", "#1d2a44",
@@ -126,7 +129,7 @@ function buildShelves() {
 
     widths.forEach((w, i) => {
       const isChosen = i === chosenIndex;
-      const width = isChosen ? Math.max(w, small ? 26 : 36) : w;
+      const width = isChosen ? Math.max(w, small ? 32 : 36) : w;   // easier to tap on phones
       shelf.appendChild(makeBook(width, usableH, isChosen));
     });
   }
@@ -180,12 +183,105 @@ function wrongBook(book) {
   book.classList.add("nudge");
 
   wrongClicks++;
-  if (wrongClicks % 3 === 0) {
-    document.querySelector(".book.chosen")?.classList.add("hint");
+
+  // her eyes adjust: every miss widens the candlelight a little (capped)
+  light.boost = Math.min(wrongClicks, 8) * 14;
+
+  const chosen = document.querySelector(".book.chosen");
+  if (wrongClicks >= 6 && wrongClicks % 3 === 0) {
+    chosen?.classList.add("hint", "beacon");   // now it glows through the dark
+    whisper("Something on these shelves is glowing...");
+  } else if (wrongClicks % 3 === 0) {
+    chosen?.classList.add("hint");
     whisper("Look for the one that doesn't quite fit.");
   } else {
     whisper(pick(WRONG_LINES));
   }
+}
+
+/* =========================================================
+   Candlelight: a warm circle of light that follows her
+   ========================================================= */
+const light = {
+  x: window.innerWidth / 2,      // where the light is drawn (trails behind)
+  y: window.innerHeight / 2,
+  tx: window.innerWidth / 2,     // where it's heading (her cursor/finger)
+  ty: window.innerHeight / 2,
+  boost: 0,                      // extra radius earned by wrong guesses
+  idle: true,                    // drifts on its own until she moves
+  active: true,
+};
+
+function lightLoop(t) {
+  if (!light.active) return;
+
+  if (light.idle) {
+    // slow wander so she notices the light before touching anything
+    light.tx = window.innerWidth / 2 + Math.sin(t / 1400) * window.innerWidth * 0.18;
+    light.ty = window.innerHeight / 2 + Math.sin(t / 1900) * window.innerHeight * 0.12;
+  }
+
+  // ease toward the target: feels like a candle being carried
+  light.x += (light.tx - light.x) * 0.12;
+  light.y += (light.ty - light.y) * 0.12;
+
+  const base = window.innerWidth < 600 ? 95 : 130;
+  const flicker = Math.sin(t / 90) * 2 + Math.random() * 3;
+  const radius = base + light.boost + flicker;
+  light.r = radius;
+
+  darkness.style.setProperty("--lx", `${light.x}px`);
+  darkness.style.setProperty("--ly", `${light.y}px`);
+  darkness.style.setProperty("--r", `${radius}px`);
+
+  requestAnimationFrame(lightLoop);
+}
+
+function moveLight(x, y) {
+  if (opened) return;
+  light.idle = false;
+  light.tx = x;
+  light.ty = y;
+  // the flame sits exactly on the pointer so clicks land where she aims
+  candleCursor.style.transform = `translate(${x}px, ${y}px)`;
+  candleCursor.classList.add("visible");
+}
+
+// On touch, the light floats above the finger so the finger doesn't hide what's lit
+const TOUCH_OFFSET = 70;
+const isTouch = (e) => e.pointerType !== "mouse";
+
+window.addEventListener("pointermove", (e) => {
+  if (isTouch(e)) moveLight(e.clientX, e.clientY - TOUCH_OFFSET);   // finger dragging
+  else moveLight(e.clientX, e.clientY);
+});
+
+window.addEventListener("pointerdown", (e) => {
+  if (!isTouch(e)) return moveLight(e.clientX, e.clientY);
+
+  // A tap inside the glow is her picking a lit book: keep the light still.
+  // A tap out in the dark moves the light there.
+  const dist = Math.hypot(e.clientX - light.x, e.clientY - light.y);
+  if (dist > (light.r || 120) * 0.8) moveLight(e.clientX, e.clientY - TOUCH_OFFSET);
+  else light.idle = false;
+});
+
+// Phones get instructions that make sense without a mouse
+if (window.matchMedia("(pointer: coarse)").matches) {
+  $("introHint").textContent = "Drag your finger to carry the candle.";
+}
+
+// keyboard users: tabbing to a book brings the light to it
+shelvesEl.addEventListener("focusin", (e) => {
+  if (!e.target.classList.contains("book")) return;
+  const box = e.target.getBoundingClientRect();
+  moveLight(box.left + box.width / 2, box.top + box.height / 2);
+});
+
+function liftDarkness() {
+  darkness.classList.add("lifted");
+  candleCursor.classList.remove("visible");
+  setTimeout(() => { light.active = false; }, 1300);
 }
 
 // 1. She pulls the Saturday book
@@ -195,8 +291,9 @@ function openLibrary(book) {
 
   whisperEl.classList.remove("show");
   book.classList.add("pulled");
+  liftDarkness();
 
-  setTimeout(openReader, 800);
+  setTimeout(openReader, 1100);
 }
 
 // 2. The book opens to a page, and the letter appears paragraph by paragraph
@@ -264,13 +361,6 @@ acceptBtn.addEventListener("click", () => {
 /* =========================================================
    Card content & countdown
    ========================================================= */
-function textSpan(className, text) {
-  const s = document.createElement("span");
-  s.className = className;
-  s.textContent = text;
-  return s;
-}
-
 function fillLetter() {
   $("letterGreeting").textContent = CONFIG.letter.greeting;
   $("letterClosing").textContent = CONFIG.letter.closing;
@@ -285,19 +375,16 @@ function fillLetter() {
 }
 
 function fillCard() {
+  $("cardTitle").textContent = CONFIG.cardTitle;
   $("cardDate").textContent = CONFIG.dateLabel;
   $("dressCode").textContent = CONFIG.dressCode;
   $("signature").textContent = CONFIG.signature;
   $("sealInitial").textContent = CONFIG.sealInitial;
 
-  const list = $("programme");
-  CONFIG.programme.forEach((item) => {
+  const list = $("highlights");
+  CONFIG.highlights.forEach((text) => {
     const li = document.createElement("li");
-    li.append(
-      textSpan("p-time", item.time),
-      textSpan("p-act", `${item.act} · ${item.title}`),
-      textSpan("p-hint", item.hint),
-    );
+    li.textContent = text;
     list.appendChild(li);
   });
 }
@@ -439,6 +526,7 @@ fillCard();
 buildShelves();
 makeDust();
 prepareEmail();
+requestAnimationFrame(lightLoop);
 updateCountdown();
 setInterval(updateCountdown, 30000);
 

@@ -23,12 +23,13 @@
 
       <article class="card" id="card" tabindex="-1">
         <p class="card-eyebrow">The pleasure of your company</p>
-        <h1 class="card-title">You are expected.</h1>
+        <h1 class="card-title" id="cardTitle"></h1>
         <p class="card-date" id="cardDate"></p>
 
         <div class="divider"><span>✦</span></div>
 
-        <ol class="programme" id="programme"></ol>
+        <p class="highlights-label">What awaits</p>
+        <ul class="highlights" id="highlights"></ul>
 
         <div class="divider"><span>✦</span></div>
 
@@ -47,6 +48,7 @@
       <div class="crown"><span class="plaque">Private Collection</span></div>
       <div class="shelves" id="shelves"></div>
       <div class="plinth"></div>
+      <div class="darkness" id="darkness"></div>
     </section>
 
   </main>
@@ -68,9 +70,13 @@
 
   <!-- Text overlays -->
   <div class="intro" id="intro">
-    <p class="intro-line">Somewhere on these shelves</p>
+    <p class="intro-line">Somewhere in the dark</p>
     <p class="intro-line">there is a book written for you.</p>
+    <p class="intro-line intro-small" id="introHint">Bring the candle closer to read the spines.</p>
   </div>
+
+  <!-- The flame that follows her cursor (desktop only) -->
+  <div class="candle-cursor" id="candleCursor"></div>
   <div class="whisper" id="whisper" role="status" aria-live="polite"></div>
 
   <script src="script.js"></script>

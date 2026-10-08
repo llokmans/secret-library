@@ -207,6 +207,7 @@ button {
 }
 
 .book.chosen span {
+  max-height: 80%;
   font-family: var(--serif);
   font-style: italic;
   font-size: 13px;
@@ -234,6 +235,64 @@ button {
 @keyframes glow-strong {
   0%, 100% { box-shadow: 0 0 10px rgba(227, 201, 143, 0.35); }
   50% { box-shadow: 0 0 28px rgba(227, 201, 143, 0.85); }
+}
+
+/* ---------- Searching by candlelight ---------- */
+
+/* lets a finger drag the light around on phones */
+.bookcase { touch-action: none; }
+
+/* A dark sheet over the shelves with a warm hole where the candle is.
+   --lx, --ly and --r are updated every frame from script.js */
+.darkness {
+  --lx: 50%;
+  --ly: 50%;
+  --r: 130px;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at var(--lx) var(--ly),
+      rgba(255, 170, 80, 0.16),
+      rgba(255, 170, 80, 0) calc(var(--r) * 0.9)),
+    radial-gradient(circle at var(--lx) var(--ly),
+      rgba(6, 4, 2, 0) calc(var(--r) * 0.35),
+      rgba(6, 4, 2, 0.82) calc(var(--r) * 0.85),
+      rgba(6, 4, 2, 0.97) calc(var(--r) * 1.15));
+  transition: opacity 1.2s ease;
+}
+
+.darkness.lifted { opacity: 0; }
+
+/* after enough misses, the right book glows through the dark */
+.book.chosen.beacon { z-index: 4; }
+
+/* the little flame cursor */
+.candle-cursor {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 8;
+  width: 10px;
+  height: 18px;
+  margin: -22px 0 0 -5px;   /* flame sits just above the click point */
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 50% 70%, #fff7d6 0 25%, #ffc35a 45%, rgba(255, 120, 30, 0.6) 70%, transparent 72%);
+  filter: drop-shadow(0 0 8px rgba(255, 180, 90, 0.8));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+
+.candle-cursor.visible { opacity: 1; }
+
+/* only on devices with a real mouse */
+@media (hover: hover) and (pointer: fine) {
+  .candle-cursor { display: block; }
+  .bookcase,
+  .bookcase * { cursor: none; }
 }
 
 /* ---------- The hidden room ---------- */
@@ -368,17 +427,36 @@ button {
   background: linear-gradient(90deg, transparent, rgba(160, 120, 60, 0.6), transparent);
 }
 
-.programme { list-style: none; display: grid; gap: 16px; }
-.programme li { display: grid; gap: 2px; }
-
-.p-time {
+.highlights-label {
+  margin-bottom: 12px;
   font-size: 0.72rem;
   letter-spacing: 0.25em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.p-act { font-size: 1.25rem; font-weight: 600; }
-.p-hint { font-style: italic; color: #5c4630; }
+
+/* inline-grid keeps the list left-aligned as a block, centred on the card */
+.highlights {
+  list-style: none;
+  display: inline-grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.highlights li {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 1.3rem;
+  font-style: italic;
+}
+
+.highlights li::before {
+  content: "✦";
+  font-style: normal;
+  font-size: 0.7rem;
+  color: #a8843f;
+}
 
 .dress span {
   display: block;
@@ -519,6 +597,8 @@ button {
 .intro-line { opacity: 0; animation: fadeUp 1.6s ease forwards; }
 .intro-line:first-child { animation-delay: 0.4s; }
 .intro-line:nth-child(2) { animation-delay: 1.4s; }
+.intro-line:nth-child(3) { animation-delay: 2.8s; }
+.intro-small { margin-top: 6px; font-size: 0.8em; color: rgba(227, 201, 143, 0.7); }
 .intro.gone { opacity: 0; }
 
 @keyframes fadeUp {
@@ -680,6 +760,7 @@ button {
   .bookcase { padding: 0 10px; }
   .card { padding: 40px 26px 36px; }
   .page { padding: 44px 26px 36px; }
+  .book.chosen span { font-size: 11px; }   /* fits "Saturday" on shorter phone shelves */
   .page-body p { font-size: 1.08rem; }
 }
 
