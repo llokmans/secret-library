@@ -19,6 +19,18 @@ const CONFIG = {
 
   dressCode: "Elegant. Something you would wear to a gallery opening.",
 
+  // The page she reads after pulling the book (write your own words here)
+  letter: {
+    greeting: "Dear Lay,",
+    paragraphs: [
+      "Some books are found by accident. This one was left here for you.",
+      "Weeks are long and good Saturdays are rare, so I took the liberty of arranging one. There is nothing for you to plan, book or decide. Every detail has already been taken care of.",
+      "All that is asked of you is to arrive as you are, and to let the evening unfold.",
+      "Turn the page, and the library will show you the rest.",
+    ],
+    closing: "Yours, in good company,",
+  },
+
   // Optional: get an email when she accepts (same EmailJS setup as the dinner site)
   emailjs: {
     enabled: true,
@@ -42,6 +54,9 @@ const intro = $("intro");
 const whisperEl = $("whisper");
 const acceptBtn = $("acceptBtn");
 const seal = $("seal");
+const reader = $("reader");
+const page = $("page");
+const turnBtn = $("turnBtn");
 
 const PALETTE = [
   "#5a1f24", "#3d1416", "#1f3a2e", "#163028", "#1d2a44",
@@ -173,6 +188,7 @@ function wrongBook(book) {
   }
 }
 
+// 1. She pulls the Saturday book
 function openLibrary(book) {
   if (opened) return;
   opened = true;
@@ -180,18 +196,60 @@ function openLibrary(book) {
   whisperEl.classList.remove("show");
   book.classList.add("pulled");
 
-  setTimeout(() => stage.classList.add("rumble"), 650);
+  setTimeout(openReader, 800);
+}
+
+// 2. The book opens to a page, and the letter appears paragraph by paragraph
+const READ_START = 1200;   // ms before the first paragraph appears
+const READ_STEP = 1400;    // ms between paragraphs
+let revealTimers = [];
+
+function openReader() {
+  intro.classList.add("gone");
+  reader.classList.add("open");
+  reader.setAttribute("aria-hidden", "false");
+  page.focus({ preventScroll: true });
+
+  const paragraphs = page.querySelectorAll(".page-body p");
+  paragraphs.forEach((p, i) => {
+    revealTimers.push(setTimeout(() => p.classList.add("show"), READ_START + i * READ_STEP));
+  });
+  revealTimers.push(setTimeout(() => page.classList.add("done"), READ_START + paragraphs.length * READ_STEP));
+}
+
+// Tapping the page shows the whole letter at once (for the impatient)
+page.addEventListener("click", (e) => {
+  if (e.target === turnBtn || page.classList.contains("done")) return;
+  revealTimers.forEach(clearTimeout);
+  page.querySelectorAll(".page-body p").forEach((p) => p.classList.add("show"));
+  page.classList.add("done");
+});
+
+// 3. She turns the page, and the bookcase opens
+turnBtn.addEventListener("click", () => {
+  turnBtn.disabled = true;
+  page.classList.add("turned");
+
+  setTimeout(() => {
+    reader.classList.remove("open");
+    reader.setAttribute("aria-hidden", "true");
+  }, 700);
+
+  setTimeout(openDoor, 1400);
+});
+
+function openDoor() {
+  stage.classList.add("rumble");
 
   setTimeout(() => {
     bookcase.classList.add("open");
-    intro.classList.add("gone");
     room.setAttribute("aria-hidden", "false");
-  }, 1250);
+  }, 600);
 
   setTimeout(() => {
     card.classList.add("show");
     card.focus({ preventScroll: true });
-  }, 2700);
+  }, 2050);
 }
 
 acceptBtn.addEventListener("click", () => {
@@ -211,6 +269,19 @@ function textSpan(className, text) {
   s.className = className;
   s.textContent = text;
   return s;
+}
+
+function fillLetter() {
+  $("letterGreeting").textContent = CONFIG.letter.greeting;
+  $("letterClosing").textContent = CONFIG.letter.closing;
+  $("letterSignature").textContent = CONFIG.signature;
+
+  const body = $("letterBody");
+  CONFIG.letter.paragraphs.forEach((text) => {
+    const p = document.createElement("p");
+    p.textContent = text;
+    body.appendChild(p);
+  });
 }
 
 function fillCard() {
@@ -260,29 +331,86 @@ function updateCountdown() {
 /* =========================================================
    Optional: EmailJS notice when she accepts
    ========================================================= */
+const EMAILJS_SDK = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
+const PENDING_KEY = "secretLibrary.pendingNotice";
+const MAX_ATTEMPTS = 3;
+
+let emailReady = null;   // promise that resolves once the SDK is loaded + initialised
+let sending = false;     // guards against two sends running at once
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// localStorage can throw (private mode, blocked storage), so never let it break the page
+const store = {
+  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
+  remove(key) { try { localStorage.removeItem(key); } catch { /* ignore */ } },
+};
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = src;
     s.onload = resolve;
-    s.onerror = reject;
+    s.onerror = () => {
+      s.remove();
+      reject(new Error(`Could not load ${src}`));
+    };
     document.head.appendChild(s);
   });
 }
 
-async function sendNotice() {
-  try {
-    await loadScript("https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js");
+function loadEmailJS() {
+  emailReady = loadScript(EMAILJS_SDK).then(() => {
     emailjs.init({ publicKey: CONFIG.emailjs.publicKey });
-    // variable names match the existing template: {{name}}, {{time}}, {{message}}
-    await emailjs.send(CONFIG.emailjs.serviceId, CONFIG.emailjs.templateId, {
-      name: "The Secret Library",
-      time: new Date().toLocaleString(),
-      message: "She opened the library and accepted. Saturday is on.",
-    });
-  } catch (err) {
-    console.warn("EmailJS notice failed:", err);
+    console.info("EmailJS: ready");
+  });
+  return emailReady;
+}
+
+// Runs on page load: get the SDK ready early, and finish any notice that failed last time
+function prepareEmail() {
+  if (!CONFIG.emailjs.enabled) return;
+
+  loadEmailJS().catch((err) => console.warn("EmailJS: SDK failed to load, will retry on send.", err));
+
+  if (store.get(PENDING_KEY)) {
+    console.info("EmailJS: found an unsent notice from a previous visit, sending now.");
+    sendNotice();
   }
+}
+
+async function sendNotice() {
+  if (sending) return;
+  sending = true;
+  store.set(PENDING_KEY, new Date().toISOString());   // remembered until it actually sends
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      // if the early load failed, try loading the SDK again
+      if (!emailReady || typeof emailjs === "undefined") loadEmailJS();
+      await emailReady;
+
+      // variable names match the existing template: {{name}}, {{time}}, {{message}}
+      await emailjs.send(CONFIG.emailjs.serviceId, CONFIG.emailjs.templateId, {
+        name: "The Secret Library",
+        time: new Date().toLocaleString(),
+        message: "She opened the library and accepted. Saturday is on.",
+      });
+
+      console.info(`EmailJS: notice sent (attempt ${attempt}).`);
+      store.remove(PENDING_KEY);
+      sending = false;
+      return;
+    } catch (err) {
+      console.warn(`EmailJS: attempt ${attempt} of ${MAX_ATTEMPTS} failed.`, err);
+      if (typeof emailjs === "undefined") emailReady = null;   // force an SDK reload
+      if (attempt < MAX_ATTEMPTS) await wait(attempt * 2000);  // 2s, then 4s
+    }
+  }
+
+  console.warn("EmailJS: all attempts failed. It will try again next time the page opens.");
+  sending = false;
 }
 
 /* =========================================================
@@ -306,9 +434,11 @@ function makeDust() {
 /* =========================================================
    Init
    ========================================================= */
+fillLetter();
 fillCard();
 buildShelves();
 makeDust();
+prepareEmail();
 updateCountdown();
 setInterval(updateCountdown, 30000);
 
